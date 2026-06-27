@@ -194,7 +194,21 @@ _FR_EN = {
     "succès": "success", "réussi": "success", "plaisir": "fun", "joie": "joy",
     "sourire": "smile", "réaction": "reaction", "réactions": "reaction",
     "manger": "eating", "déguster": "tasting", "partager": "sharing",
+    "ville": "city", "classement": "ranking", "palmarès": "ranking", "palmares": "ranking",
+    "artisanal": "artisan", "artisanale": "artisan", "artisan": "artisan",
+    "chef": "chef", "cuisinier": "chef", "napolitaine": "naples pizza",
+    "italienne": "italian", "italien": "italian", "meilleur": "best", "meilleure": "best",
 }
+
+
+def _lookup(word: str) -> str | None:
+    """Traduit un mot ; gère le pluriel français en retombant sur la forme au singulier."""
+    en = _FR_EN.get(word)
+    if en:
+        return en
+    if word.endswith("s") and len(word) > 4:           # pizzerias -> pizzeria
+        return _FR_EN.get(word[:-1])
+    return None
 
 
 def _en_words(s: str) -> list[str]:
@@ -203,7 +217,7 @@ def _en_words(s: str) -> list[str]:
     for w in re.findall(r"[A-Za-zÀ-ÿ]{3,}", s.lower()):
         if w in _STOPWORDS:
             continue
-        en = _FR_EN.get(w)
+        en = _lookup(w)
         if en and en not in out:
             out.append(en)
     return out
