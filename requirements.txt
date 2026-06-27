@@ -1,0 +1,7 @@
+# Cœur du pipeline
+edge-tts>=6.1.9          # voix off gratuite (Microsoft) + timing mot-à-mot
+trafilatura>=1.8.0       # extraction propre du texte d'un article depuis une URL
+anthropic>=0.40.0        # génération du scénario via Claude Haiku (optionnel)
+requests>=2.31.0         # téléchargement des images (Pexels/Pixabay)
+python-dotenv>=1.0.0     # lecture du fichier .env
+Pillow>=10.0.0           # images de secours (dégradés) si pas de clé banque d'images
