@@ -126,11 +126,15 @@ def _extractive_script(title: str, text: str, site_url: str, target: int) -> Sho
     sentences = _split_sentences(text)
     budget_words = int(target * 2.5)
 
+    # Ancrage commun à toutes les scènes : le sujet de l'article (tiré du titre).
+    # Évite qu'une scène au texte abstrait parte sur un visuel hors-sujet.
+    anchor = _topic(title)
+
     scenes: list[Scene] = []
     used = 0
     # Accroche = titre reformulé.
     hook = title.rstrip(".!?") + " ?"
-    scenes.append(Scene(narration=hook, image_query=_keywords(title)))
+    scenes.append(Scene(narration=hook, image_query=_keywords(title, anchor)))
     used += len(hook.split())
 
     for sent in sentences:
@@ -139,12 +143,12 @@ def _extractive_script(title: str, text: str, site_url: str, target: int) -> Sho
         sent = sent.strip()
         if len(sent.split()) < 4:
             continue
-        scenes.append(Scene(narration=sent, image_query=_keywords(sent)))
+        scenes.append(Scene(narration=sent, image_query=_keywords(sent, anchor)))
         used += len(sent.split())
 
     scenes.append(Scene(
         narration="Tu veux la suite ? L'article complet est sur mon site, lien en description.",
-        image_query="person reading phone website",
+        image_query=(f"{anchor} person phone" if anchor else "person reading phone website"),
         is_cta=True,
     ))
 
@@ -162,14 +166,60 @@ _STOPWORDS = {
     "le", "la", "les", "un", "une", "des", "de", "du", "et", "à", "en", "dans",
     "pour", "sur", "par", "avec", "que", "qui", "quoi", "est", "sont", "ce",
     "cette", "ces", "son", "sa", "ses", "au", "aux", "plus", "mais", "ou", "où",
-    "the", "a", "an", "of", "to", "in", "and", "is", "are",
+    "vous", "nous", "tout", "tous", "vos", "votre", "leur", "leurs", "sans", "bien",
+    "the", "a", "an", "of", "to", "in", "and", "is", "are", "your", "you",
+}
+
+# Mini-dictionnaire FR->EN du vocabulaire concret/visuel le plus courant.
+# But : produire des requêtes EN (banques d'images/vidéos bien plus fournies).
+# Mot inconnu -> on l'ignore plutôt que de polluer la requête avec du français.
+_FR_EN = {
+    "pizza": "pizza", "pizzas": "pizza", "pizzeria": "pizzeria",
+    "anniversaire": "birthday", "fête": "party", "fete": "party", "fêtes": "party",
+    "invités": "guests", "invité": "guests", "invites": "guests", "convives": "guests",
+    "enfant": "children", "enfants": "children", "adulte": "adults", "adultes": "adults",
+    "ami": "friends", "amis": "friends", "famille": "family", "couple": "couple",
+    "personne": "person", "gens": "people", "groupe": "group", "monde": "people",
+    "part": "slices", "parts": "slices", "tranche": "slices", "portion": "portions",
+    "repas": "meal", "plat": "dish", "plats": "dishes", "cuisine": "cooking",
+    "fromage": "cheese", "pâte": "dough", "pate": "dough", "four": "oven",
+    "restaurant": "restaurant", "livraison": "delivery", "commande": "order",
+    "commander": "ordering", "traiteur": "catering", "buffet": "buffet",
+    "gâteau": "cake", "gateau": "cake", "boisson": "drinks", "apéritif": "appetizer",
+    "table": "table", "maison": "home", "soirée": "evening party", "soiree": "evening party",
+    "décoration": "decoration", "decoration": "decoration", "ballons": "balloons",
+    "bougies": "candles", "ambiance": "atmosphere", "célébration": "celebration",
+    "argent": "money", "budget": "budget", "prix": "price", "économie": "savings",
+    "conseil": "tips", "conseils": "tips", "guide": "guide", "astuce": "tips",
+    "succès": "success", "réussi": "success", "plaisir": "fun", "joie": "joy",
+    "sourire": "smile", "réaction": "reaction", "réactions": "reaction",
+    "manger": "eating", "déguster": "tasting", "partager": "sharing",
 }
 
 
-def _keywords(s: str) -> str:
-    words = re.findall(r"[A-Za-zÀ-ÿ]{4,}", s.lower())
-    words = [w for w in words if w not in _STOPWORDS]
-    return " ".join(words[:3]) if words else "abstract background"
+def _en_words(s: str) -> list[str]:
+    """Mots-clés EN tirés de `s` : traduits via le dico, mots inconnus écartés."""
+    out: list[str] = []
+    for w in re.findall(r"[A-Za-zÀ-ÿ]{3,}", s.lower()):
+        if w in _STOPWORDS:
+            continue
+        en = _FR_EN.get(w)
+        if en and en not in out:
+            out.append(en)
+    return out
+
+
+def _topic(title: str) -> str:
+    """Ancrage : 1-2 mots-clés EN qui résument le sujet de l'article (depuis le titre)."""
+    return " ".join(_en_words(title)[:2])
+
+
+def _keywords(s: str, anchor: str = "") -> str:
+    """Requête image/vidéo d'une scène : ancrage du sujet + 1-2 mots-clés EN propres à la scène."""
+    anchor_words = anchor.split()
+    scene = [w for w in _en_words(s) if w not in anchor_words][:2]
+    parts = list(dict.fromkeys(anchor_words + scene))[:4]
+    return " ".join(parts) if parts else "abstract background"
 
 
 def _split_sentences(text: str) -> list[str]:
