@@ -26,7 +26,7 @@ def load_source(source: str) -> Article:
 def _from_url(url: str) -> Article:
     import trafilatura
 
-    downloaded = trafilatura.fetch_url(url)
+    downloaded = _download_html(url)
     if not downloaded:
         raise RuntimeError(f"Impossible de télécharger l'article : {url}")
 
@@ -48,6 +48,28 @@ def _from_url(url: str) -> Article:
         pass
 
     return Article(title=title.strip(), text=text.strip(), url=url)
+
+
+def _download_html(url: str) -> str | None:
+    """Télécharge le HTML via `requests`.
+
+    Le downloader interne de trafilatura n'accepte que les proxys SOCKS et fige
+    le CA `certifi` ; il échoue donc derrière un proxy HTTP d'entreprise à TLS
+    intercepté. `requests` honore HTTPS_PROXY et REQUESTS_CA_BUNDLE -> on récupère
+    le HTML ici, puis trafilatura fait l'extraction comme prévu.
+    """
+    import requests
+
+    try:
+        resp = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; shortmaker/1.0)"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.text
+    except Exception:
+        return None
 
 
 def _from_text(raw: str, url: str | None) -> Article:
