@@ -1,7 +1,9 @@
-"""Étape 4 — une image verticale par scène, depuis une banque GRATUITE.
+"""Étape 4 — une image verticale par scène.
 
-Ordre d'essai : Pexels -> Pixabay -> dégradé généré localement (toujours dispo).
-Les requêtes sont en anglais (meilleurs résultats sur ces banques).
+Ordre d'essai : [FLUX si IMAGE_PROVIDER=flux] -> Pexels -> Pixabay -> dégradé local.
+Le repli est toujours assuré : si l'IA échoue (quota, refus, réseau), on retombe
+sur la banque gratuite, puis sur un dégradé hors-ligne.
+Les requêtes sont en anglais (meilleurs résultats sur les banques et les modèles).
 """
 from __future__ import annotations
 
@@ -17,6 +19,11 @@ _TIMEOUT = 20
 
 def fetch_image(query: str, dst_path: str, seed: int = 0) -> str:
     """Télécharge une image portrait pour `query` vers `dst_path`. Renvoie le chemin."""
+    if SETTINGS.image_provider == "flux" and SETTINGS.fal_api_key:
+        url = _flux(query, seed)
+        if url and _download(url, dst_path):
+            return dst_path
+        print("[images] FLUX indisponible -> repli banque gratuite.")
     if SETTINGS.pexels_api_key:
         url = _pexels(query, seed)
         if url and _download(url, dst_path):
@@ -28,6 +35,46 @@ def fetch_image(query: str, dst_path: str, seed: int = 0) -> str:
     # Dernier recours : on fabrique un fond dégradé lisible, hors-ligne.
     _gradient(query, dst_path)
     return dst_path
+
+
+# ---------------------------------------------------------------- FLUX (fal.ai)
+
+def _build_prompt(query: str) -> str:
+    """Mot-clé de scène -> prompt descriptif + style commun (cohérence inter-scènes)."""
+    return f"{query}. {SETTINGS.image_style}"
+
+
+def _flux(query: str, seed: int) -> str | None:
+    """Génère une image via FLUX (fal.ai) et renvoie son URL.
+
+    Endpoint synchrone fal.run : un POST renvoie directement l'URL de l'image.
+    Changer de modèle = changer FLUX_ENDPOINT (schnell par défaut, ou .../flux/dev).
+    `requests` honore le proxy HTTPS + le CA de l'environnement.
+    """
+    try:
+        r = requests.post(
+            SETTINGS.flux_endpoint,
+            headers={
+                "Authorization": f"Key {SETTINGS.fal_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "prompt": _build_prompt(query),
+                "image_size": "portrait_16_9",   # vertical 9:16
+                "num_images": 1,
+                "seed": seed,                      # reproductible par scène
+                "enable_safety_checker": True,
+            },
+            timeout=120,
+        )
+        r.raise_for_status()
+        images = r.json().get("images", [])
+        if not images:
+            return None
+        return images[0].get("url")
+    except Exception as e:
+        print(f"[images] FLUX: {e}")
+        return None
 
 
 # ---------------------------------------------------------------- Pexels

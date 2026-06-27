@@ -37,11 +37,29 @@ Caractéristiques :
 | Voix off       | Edge-TTS (Microsoft)| 0 €  |
 | Voix off (option premium) | ElevenLabs | gratuit ~10k car./mois |
 | Images         | Pexels / Pixabay    | 0 €  |
+| Images (option qualité) | FLUX schnell (fal.ai) | ~0,02 € / short |
 | Montage        | ffmpeg              | 0 €  |
 | Scénario       | Claude Haiku (option)| ~0,01 € / short |
 
 Sans clé Anthropic, le scénario bascule sur un **résumé extractif 100 % gratuit**.
 Sans clé d'images, un **fond dégradé** est généré localement (les sous-titres restent lisibles).
+
+### Images IA (option qualité, FLUX)
+
+Par défaut les images viennent des banques gratuites (`IMAGE_PROVIDER=stock`). Pour
+des visuels générés sur mesure, passe à **FLUX** (Black Forest Labs) via fal.ai :
+
+```bash
+export IMAGE_PROVIDER=flux
+export FAL_KEY=...            # https://fal.ai/dashboard/keys
+python make_short.py "https://mon-site.fr/article" --site https://mon-site.fr
+```
+
+- **FLUX.1 schnell** (défaut) : ~0,003 $/image → **~2 cts/short**, très bonne qualité.
+- Modèle supérieur : `export FLUX_ENDPOINT=https://fal.run/fal-ai/flux/dev`.
+- Style commun à toutes les scènes (cohérence) réglable via `IMAGE_STYLE`.
+- Repli automatique : si FLUX échoue (quota, refus, réseau), on retombe sur
+  Pexels/Pixabay puis sur le dégradé local — un short sort toujours.
 
 ## Installation
 
