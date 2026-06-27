@@ -142,10 +142,25 @@ Lister les voix françaises disponibles :
 edge-tts --list-voices | grep fr-
 ```
 
+## Interface web
+
+Pour générer un Short sans ligne de commande : colle une URL **ou le texte** de
+ton article, choisis la voix et le type de visuel, récupère la vidéo + le texte
+YouTube directement dans le navigateur.
+
+```bash
+python web.py            # puis ouvre http://localhost:5000
+```
+
+L'UI réutilise le moteur `make_short.py` (lancé en sous-processus) et affiche la
+progression en direct. Réglages exposés : voix (ElevenLabs ou Edge gratuit),
+visuel (clips vidéo ou images animées), source des images (banque gratuite ou IA).
+
 ## Comment c'est organisé
 
 ```
 make_short.py            # orchestrateur en ligne de commande
+web.py                   # interface web (Flask) : article -> vidéo dans le navigateur
 shortmaker/
   config.py              # réglages (format 1080x1920, voix, modèle…)
   extract.py             # URL/fichier/texte -> texte propre de l'article
@@ -153,7 +168,8 @@ shortmaker/
   tts.py                 # scénario -> voix off + timing mot-à-mot (Edge-TTS)
   images.py              # mots-clés -> image verticale (Pexels/Pixabay/dégradé)
   captions.py            # timings -> sous-titres ASS calés au mot
-  video.py               # assemblage final ffmpeg (clips, audio, sous-titres, CTA)
+  videos.py              # mots-clés -> court clip vidéo vertical (Pexels, mode video)
+  video.py               # assemblage final ffmpeg (clips, fondus, audio, sous-titres, CTA)
 ```
 
 ## Notes
