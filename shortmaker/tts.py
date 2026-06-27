@@ -69,13 +69,70 @@ async def _synth_one(text: str, voice: str, mp3_path: str) -> list[WordTiming]:
     return words
 
 
-def synthesize(text: str, voice: str, mp3_path: str) -> VoiceClip:
-    words = asyncio.run(_synth_one(text, voice, mp3_path))
+def synthesize(text: str, voice: str, mp3_path: str,
+               engine: str = "edge", allow_fallback: bool = True) -> VoiceClip:
+    """Synthétise `text`. engine = "edge" (en ligne, timing exact) ou "espeak" (hors-ligne)."""
+    if engine == "espeak":
+        return _synthesize_espeak(text, mp3_path)
+
+    try:
+        words = asyncio.run(_synth_one(text, voice, mp3_path))
+    except Exception as e:
+        if not allow_fallback:
+            raise
+        print(f"[tts] Edge-TTS indisponible ({type(e).__name__}); repli hors-ligne espeak-ng.")
+        return _synthesize_espeak(text, mp3_path)
+
     duration = _probe_duration(mp3_path)
     # Garde-fou : caler la fin du dernier mot sur la durée réelle de l'audio.
     if words and words[-1].end > duration:
         words[-1].end = duration
     return VoiceClip(mp3_path=mp3_path, duration=duration, words=words)
+
+
+def _synthesize_espeak(text: str, out_path: str) -> VoiceClip:
+    """Voix off 100 % hors-ligne via espeak-ng (qualité 'preview', sans réseau).
+
+    espeak ne fournit pas le timing des mots : on l'approxime proportionnellement
+    à la longueur des mots sur la durée réelle de l'audio.
+    """
+    import os
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        wav = tmp.name
+    try:
+        subprocess.run(
+            ["espeak-ng", "-v", "fr", "-s", "155", "-p", "40", "-w", wav, text],
+            capture_output=True, check=True,
+        )
+        # Transcode en mp3 pour rester homogène avec le reste du pipeline.
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", wav, "-c:a", "libmp3lame", "-q:a", "4", out_path],
+            capture_output=True, check=True,
+        )
+    finally:
+        if os.path.exists(wav):
+            os.remove(wav)
+
+    duration = _probe_duration(out_path)
+    words = _approx_word_timings(text, duration)
+    return VoiceClip(mp3_path=out_path, duration=duration, words=words)
+
+
+def _approx_word_timings(text: str, duration: float) -> list[WordTiming]:
+    tokens = text.split()
+    if not tokens:
+        return []
+    weights = [len(t) + 1 for t in tokens]  # +1 pour la pause inter-mots
+    total = sum(weights)
+    out: list[WordTiming] = []
+    t = 0.0
+    for tok, w in zip(tokens, weights):
+        dt = duration * w / total
+        out.append(WordTiming(text=tok, start=t, end=t + dt))
+        t += dt
+    return out
 
 
 def _probe_duration(path: str) -> float:
