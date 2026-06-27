@@ -158,6 +158,28 @@ L'UI réutilise le moteur `make_short.py` (lancé en sous-processus) et affiche 
 progression en direct. Réglages exposés : voix (ElevenLabs ou Edge gratuit),
 visuel (clips vidéo ou images animées), source des images (banque gratuite ou IA).
 
+### Déploiement (obtenir une URL en ligne)
+
+L'app est packagée dans un `Dockerfile` (Python + ffmpeg + espeak-ng + polices,
+servie par gunicorn). En local :
+
+```bash
+docker build -t shortmaker .
+docker run -p 8080:8080 \
+  -e ELEVENLABS_API_KEY=... -e PEXELS_API_KEY=... \
+  -e OPENROUTER_API_KEY=...                       \
+  shortmaker
+# -> http://localhost:8080
+```
+
+Pour une **URL publique permanente**, déploie cette image sur un hébergeur qui
+gère Docker (Render, Railway, Fly.io, Google Cloud Run…) : connecte le dépôt,
+renseigne les clés API en variables d'environnement, et l'hébergeur fournit
+l'URL. La génération étant lourde (ffmpeg), prévois une instance avec assez de
+CPU/RAM ; les jobs sont en mémoire (1 worker). Pour un usage multi-utilisateurs,
+remplace ce stockage en mémoire par une file de jobs persistante (Redis/Celery)
+et un stockage objet (S3) pour les vidéos produites.
+
 ## Comment c'est organisé
 
 ```
