@@ -34,8 +34,8 @@ def main() -> int:
     p.add_argument("--out", default=None, help="Dossier de sortie (défaut: ./out/<slug>/).")
     p.add_argument("--site", default=SETTINGS.site_url, help="URL de ton site (appel à l'action).")
     p.add_argument("--voice", default=SETTINGS.tts_voice, help="Voix Edge-TTS (ex: fr-FR-HenriNeural).")
-    p.add_argument("--tts", choices=["edge", "espeak"], default="edge",
-                   help="Moteur voix : edge (en ligne, timing exact) ou espeak (hors-ligne).")
+    p.add_argument("--tts", choices=["auto", "eleven", "edge", "espeak"], default="auto",
+                   help="Moteur voix : auto (eleven si clé, sinon edge), eleven, edge, espeak.")
     p.add_argument("--no-llm", action="store_true", help="Forcer le résumé gratuit (sans Claude).")
     p.add_argument("--no-motion", action="store_true", help="Désactiver le léger zoom des images.")
     args = p.parse_args()
@@ -58,13 +58,16 @@ def main() -> int:
     os.makedirs(assets, exist_ok=True)
 
     # 3) Voix off scène par scène (durée + timing mot-à-mot)
-    print("• Voix off (Edge-TTS)…")
+    engine = args.tts
+    if engine == "auto":
+        engine = "eleven" if SETTINGS.elevenlabs_api_key else "edge"
+    print(f"• Voix off ({engine})…")
     mp3s, durations, scene_cues = [], [], []
     t_cursor = 0.0
     cta_start = cta_end = 0.0
     for i, scene in enumerate(sc.scenes):
         mp3 = os.path.join(assets, f"voice_{i:02d}.mp3")
-        clip = tts.synthesize(scene.narration, args.voice, mp3, engine=args.tts)
+        clip = tts.synthesize(scene.narration, args.voice, mp3, engine=engine)
         mp3s.append(mp3)
         durations.append(clip.duration)
         scene_cues.append(cap.SceneCues(start_abs=t_cursor, words=clip.words, is_cta=scene.is_cta))

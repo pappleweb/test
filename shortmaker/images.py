@@ -93,23 +93,54 @@ def _download(url: str, dst_path: str) -> bool:
 
 
 def _gradient(query: str, dst_path: str) -> None:
-    """Fond dégradé déterministe (couleur dérivée du texte) avec le mot-clé écrit dessus."""
-    from PIL import Image, ImageDraw
+    """Arrière-plan graphique généré localement (sans réseau) : dégradé coloré vif,
+    vignette et quelques halos lumineux. Couleur déterministe dérivée des mots-clés,
+    donc chaque scène a un visuel distinct et net."""
+    import colorsys
+
+    from PIL import Image, ImageDraw, ImageFilter
 
     h = hashlib.md5(query.encode()).digest()
-    top = (h[0], h[1], h[2])
-    bottom = (h[3] // 2, h[4] // 2, h[5] // 2)
+    hue = h[0] / 255.0                     # teinte vive propre à la scène
+    hue2 = (hue + 0.08 + h[1] / 1024.0) % 1.0
 
-    img = Image.new("RGB", (WIDTH, HEIGHT))
-    px = img.load()
+    def rgb(hh, s, v):
+        r, g, b = colorsys.hsv_to_rgb(hh, s, v)
+        return int(r * 255), int(g * 255), int(b * 255)
+
+    top = rgb(hue, 0.65, 0.95)             # haut clair et saturé
+    bottom = rgb(hue2, 0.85, 0.32)         # bas plus sombre -> profondeur
+
+    # Dégradé vertical (rapide, ligne par ligne sur une image fine puis redimensionnée).
+    strip = Image.new("RGB", (1, HEIGHT))
+    sp = strip.load()
     for y in range(HEIGHT):
         t = y / HEIGHT
-        px_row = (
+        sp[0, y] = (
             int(top[0] * (1 - t) + bottom[0] * t),
             int(top[1] * (1 - t) + bottom[1] * t),
             int(top[2] * (1 - t) + bottom[2] * t),
         )
-        for x in range(WIDTH):
-            px[x, y] = px_row
-    ImageDraw.Draw(img)  # (texte volontairement omis : les sous-titres suffisent)
-    img.save(dst_path, "JPEG", quality=88)
+    img = strip.resize((WIDTH, HEIGHT))
+
+    # Halos lumineux translucides (effet "bokeh") pour donner du relief.
+    overlay = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    glow = rgb(hue, 0.45, 1.0)
+    for i in range(3):
+        cx = (h[2 + i] / 255.0) * WIDTH
+        cy = (h[5 + i] / 255.0) * HEIGHT
+        r = 180 + (h[8 + i] / 255.0) * 360
+        od.ellipse([cx - r, cy - r, cx + r, cy + r], fill=glow)
+    overlay = overlay.filter(ImageFilter.GaussianBlur(160))
+    img = Image.blend(img, overlay, 0.28)
+
+    # Vignette (assombrit les bords) pour faire ressortir les sous-titres.
+    vignette = Image.new("L", (WIDTH, HEIGHT), 0)
+    vd = ImageDraw.Draw(vignette)
+    vd.ellipse([-WIDTH * 0.3, -HEIGHT * 0.15, WIDTH * 1.3, HEIGHT * 1.15], fill=255)
+    vignette = vignette.filter(ImageFilter.GaussianBlur(220))
+    dark = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
+    img = Image.composite(img, dark, vignette)
+
+    img.save(dst_path, "JPEG", quality=90)

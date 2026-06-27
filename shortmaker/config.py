@@ -13,10 +13,12 @@ WIDTH = 1080
 HEIGHT = 1920
 FPS = 30
 
-# Police utilisée pour les sous-titres et l'appel à l'action (présente sur la plupart des Linux).
-FONT_NAME = "DejaVu Sans"
+# Police des sous-titres : nom reconnu par libass (fontconfig).
+# Liberation Sans = très proche d'Arial/Helvetica, rendu net et "neutre" idéal pour les Shorts.
+CAPTION_FONT = os.getenv("CAPTION_FONT", "Liberation Sans")
+# Fichier de police pour la bannière incrustée (drawtext a besoin du chemin).
 FONT_FILE = os.getenv(
-    "FONT_FILE", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    "FONT_FILE", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
 )
 
 
@@ -27,6 +29,10 @@ class Settings:
     pexels_api_key: str | None = os.getenv("PEXELS_API_KEY")
     pixabay_api_key: str | None = os.getenv("PIXABAY_API_KEY")
     tts_voice: str = os.getenv("TTS_VOICE", "fr-FR-DeniseNeural")
+    # ElevenLabs (offre gratuite ~10k caractères/mois). Voix féminine FR par défaut : "Charlotte".
+    elevenlabs_api_key: str | None = os.getenv("ELEVENLABS_API_KEY")
+    elevenlabs_voice_id: str = os.getenv("ELEVENLABS_VOICE_ID", "XB0fDUnXU5powFXDhCwa")
+    elevenlabs_model: str = os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2")
     site_url: str = os.getenv("SITE_URL", "https://mon-site.fr")
     # Durée cible de la narration (un Short fait <= 60 s).
     target_seconds: int = int(os.getenv("TARGET_SECONDS", "45"))

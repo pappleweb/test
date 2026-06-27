@@ -35,6 +35,7 @@ Caractéristiques :
 |----------------|---------------------|------|
 | Extraction     | trafilatura         | 0 €  |
 | Voix off       | Edge-TTS (Microsoft)| 0 €  |
+| Voix off (option premium) | ElevenLabs | gratuit ~10k car./mois |
 | Images         | Pexels / Pixabay    | 0 €  |
 | Montage        | ffmpeg              | 0 €  |
 | Scénario       | Claude Haiku (option)| ~0,01 € / short |
@@ -57,6 +58,9 @@ cp .env.example .env        # puis remplis les clés que tu as (toutes optionnel
 - **Pexels** — https://www.pexels.com/api/ → `PEXELS_API_KEY`
 - **Pixabay** (secours) — https://pixabay.com/api/docs/ → `PIXABAY_API_KEY`
 - **Anthropic** (meilleur scénario) — https://console.anthropic.com/ → `ANTHROPIC_API_KEY`
+- **ElevenLabs** (voix premium, optionnel) — https://elevenlabs.io/ → `ELEVENLABS_API_KEY`
+  (offre gratuite ~10k caractères/mois ; voix féminine FR « Charlotte » par défaut).
+  Si la clé est présente, elle est utilisée automatiquement (`--tts auto`).
 
 ## Utilisation
 
@@ -77,6 +81,7 @@ Options utiles :
 |---------------|--------------------------------------------------------------|
 | `--site URL`  | URL affichée dans l'appel à l'action (défaut: `SITE_URL`).   |
 | `--voice NOM` | Voix Edge-TTS (`fr-FR-DeniseNeural`, `fr-FR-HenriNeural`, …). |
+| `--tts MOTEUR`| `auto` (défaut), `eleven` (ElevenLabs), `edge`, `espeak` (hors-ligne). |
 | `--no-llm`    | Force le scénario gratuit (sans Claude).                     |
 | `--no-motion` | Désactive le zoom des images.                                |
 | `--out DOSSIER`| Dossier de sortie.                                          |

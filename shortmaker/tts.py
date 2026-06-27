@@ -71,9 +71,23 @@ async def _synth_one(text: str, voice: str, mp3_path: str) -> list[WordTiming]:
 
 def synthesize(text: str, voice: str, mp3_path: str,
                engine: str = "edge", allow_fallback: bool = True) -> VoiceClip:
-    """Synthétise `text`. engine = "edge" (en ligne, timing exact) ou "espeak" (hors-ligne)."""
+    """Synthétise `text`.
+
+    engine : "eleven" (ElevenLabs, voix premium + timing précis),
+             "edge"   (Microsoft, gratuit, timing exact),
+             "espeak" (hors-ligne, sans réseau).
+    """
     if engine == "espeak":
         return _synthesize_espeak(text, mp3_path)
+
+    if engine == "eleven":
+        try:
+            return _synthesize_eleven(text, mp3_path)
+        except Exception as e:
+            if not allow_fallback:
+                raise
+            print(f"[tts] ElevenLabs indisponible ({type(e).__name__}: {e}); repli espeak-ng.")
+            return _synthesize_espeak(text, mp3_path)
 
     try:
         words = asyncio.run(_synth_one(text, voice, mp3_path))
@@ -88,6 +102,74 @@ def synthesize(text: str, voice: str, mp3_path: str,
     if words and words[-1].end > duration:
         words[-1].end = duration
     return VoiceClip(mp3_path=mp3_path, duration=duration, words=words)
+
+
+def _synthesize_eleven(text: str, out_path: str) -> VoiceClip:
+    """Voix premium ElevenLabs avec calage au mot via l'endpoint *with-timestamps*.
+
+    Nécessite ELEVENLABS_API_KEY (offre gratuite ~10k caractères/mois).
+    Voix féminine FR par défaut ("Charlotte") ; modifiable via ELEVENLABS_VOICE_ID.
+    """
+    import base64
+
+    import requests
+
+    from .config import SETTINGS
+
+    key = SETTINGS.elevenlabs_api_key
+    if not key:
+        raise RuntimeError("ELEVENLABS_API_KEY manquante")
+
+    url = (
+        f"https://api.elevenlabs.io/v1/text-to-speech/"
+        f"{SETTINGS.elevenlabs_voice_id}/with-timestamps"
+    )
+    resp = requests.post(
+        url,
+        headers={"xi-api-key": key, "Content-Type": "application/json"},
+        json={
+            "text": text,
+            "model_id": SETTINGS.elevenlabs_model,
+            "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+        },
+        timeout=60,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    with open(out_path, "wb") as f:
+        f.write(base64.b64decode(data["audio_base64"]))
+
+    words = _words_from_char_alignment(data.get("alignment") or {})
+    duration = _probe_duration(out_path)
+    if not words:
+        words = _approx_word_timings(text, duration)
+    return VoiceClip(mp3_path=out_path, duration=duration, words=words)
+
+
+def _words_from_char_alignment(alignment: dict) -> list[WordTiming]:
+    """Convertit l'alignement caractère par caractère d'ElevenLabs en timings de mots."""
+    chars = alignment.get("characters") or []
+    starts = alignment.get("character_start_times_seconds") or []
+    ends = alignment.get("character_end_times_seconds") or []
+    if not (len(chars) == len(starts) == len(ends)) or not chars:
+        return []
+
+    words: list[WordTiming] = []
+    cur, cur_start, cur_end = "", None, None
+    for ch, st, en in zip(chars, starts, ends):
+        if ch.isspace():
+            if cur:
+                words.append(WordTiming(cur, cur_start, cur_end))
+                cur, cur_start, cur_end = "", None, None
+        else:
+            if not cur:
+                cur_start = st
+            cur += ch
+            cur_end = en
+    if cur:
+        words.append(WordTiming(cur, cur_start, cur_end))
+    return words
 
 
 def _synthesize_espeak(text: str, out_path: str) -> VoiceClip:
