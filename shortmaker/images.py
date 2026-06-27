@@ -1,6 +1,6 @@
 """Étape 4 — une image verticale par scène.
 
-Ordre d'essai : [FLUX si IMAGE_PROVIDER=flux] -> Pexels -> Pixabay -> dégradé local.
+Ordre d'essai : [IA si IMAGE_PROVIDER=flux/openrouter] -> Pexels -> Pixabay -> dégradé local.
 Le repli est toujours assuré : si l'IA échoue (quota, refus, réseau), on retombe
 sur la banque gratuite, puis sur un dégradé hors-ligne.
 Les requêtes sont en anglais (meilleurs résultats sur les banques et les modèles).
@@ -19,6 +19,10 @@ _TIMEOUT = 20
 
 def fetch_image(query: str, dst_path: str, seed: int = 0) -> str:
     """Télécharge une image portrait pour `query` vers `dst_path`. Renvoie le chemin."""
+    if SETTINGS.image_provider == "openrouter" and SETTINGS.openrouter_api_key:
+        if _openrouter(query, dst_path):
+            return dst_path
+        print("[images] OpenRouter indisponible -> repli banque gratuite.")
     if SETTINGS.image_provider == "flux" and SETTINGS.fal_api_key:
         url = _flux(query, seed)
         if url and _download(url, dst_path):
@@ -75,6 +79,44 @@ def _flux(query: str, seed: int) -> str | None:
     except Exception as e:
         print(f"[images] FLUX: {e}")
         return None
+
+
+# ---------------------------------------------------------------- OpenRouter (Gemini image)
+
+def _openrouter(query: str, dst_path: str) -> bool:
+    """Génère une image via OpenRouter (modèles Gemini image) et l'écrit dans dst_path.
+
+    OpenRouter renvoie l'image en data-URL base64 dans `message.images` -> pas de
+    téléchargement séparé. `requests` honore le proxy HTTPS + le CA de l'environnement.
+    """
+    import base64
+
+    try:
+        r = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {SETTINGS.openrouter_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": SETTINGS.openrouter_image_model,
+                "messages": [{"role": "user", "content": _build_prompt(query)}],
+                "modalities": ["image", "text"],
+            },
+            timeout=120,
+        )
+        r.raise_for_status()
+        images = r.json()["choices"][0]["message"].get("images") or []
+        if not images:
+            return False
+        data_url = images[0]["image_url"]["url"]
+        data = base64.b64decode(data_url.split(",", 1)[1])
+        with open(dst_path, "wb") as f:
+            f.write(data)
+        return os.path.getsize(dst_path) > 1024
+    except Exception as e:
+        print(f"[images] OpenRouter: {e}")
+        return False
 
 
 # ---------------------------------------------------------------- Pexels

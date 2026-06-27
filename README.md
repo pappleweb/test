@@ -38,16 +38,19 @@ Caractéristiques :
 | Voix off (option premium) | ElevenLabs | gratuit ~10k car./mois |
 | Images         | Pexels / Pixabay    | 0 €  |
 | Images (option qualité) | FLUX schnell (fal.ai) | ~0,02 € / short |
+| Images (option qualité) | Gemini image (OpenRouter) | ~0,5 € / short |
 | Montage        | ffmpeg              | 0 €  |
 | Scénario       | Claude Haiku (option)| ~0,01 € / short |
 
 Sans clé Anthropic, le scénario bascule sur un **résumé extractif 100 % gratuit**.
 Sans clé d'images, un **fond dégradé** est généré localement (les sous-titres restent lisibles).
 
-### Images IA (option qualité, FLUX)
+### Images IA (option qualité)
 
 Par défaut les images viennent des banques gratuites (`IMAGE_PROVIDER=stock`). Pour
-des visuels générés sur mesure, passe à **FLUX** (Black Forest Labs) via fal.ai :
+des visuels générés sur mesure, deux providers IA sont dispos.
+
+**FLUX** (Black Forest Labs, via fal.ai) — le moins cher :
 
 ```bash
 export IMAGE_PROVIDER=flux
@@ -55,10 +58,24 @@ export FAL_KEY=...            # https://fal.ai/dashboard/keys
 python make_short.py "https://mon-site.fr/article" --site https://mon-site.fr
 ```
 
-- **FLUX.1 schnell** (défaut) : ~0,003 $/image → **~2 cts/short**, très bonne qualité.
+- **FLUX.1 schnell** (défaut) : ~0,003 $/image → **~2 cts/short**.
 - Modèle supérieur : `export FLUX_ENDPOINT=https://fal.run/fal-ai/flux/dev`.
-- Style commun à toutes les scènes (cohérence) réglable via `IMAGE_STYLE`.
-- Repli automatique : si FLUX échoue (quota, refus, réseau), on retombe sur
+
+**Gemini** (via OpenRouter) — cadrage 9:16 natif :
+
+```bash
+export IMAGE_PROVIDER=openrouter
+export OPENROUTER_API_KEY=...   # https://openrouter.ai/keys
+python make_short.py "https://mon-site.fr/article" --site https://mon-site.fr
+```
+
+- **gemini-3.1-flash-image** (défaut) : 9:16 vertical natif, ~0,07 $/image (~0,5 $/short).
+- Moins cher mais carré : `export OPENROUTER_IMAGE_MODEL=google/gemini-2.5-flash-image`.
+
+Communs aux deux :
+
+- Style partagé entre les scènes (cohérence) réglable via `IMAGE_STYLE`.
+- Repli automatique : si l'IA échoue (quota, refus, réseau), on retombe sur
   Pexels/Pixabay puis sur le dégradé local — un short sort toujours.
 
 ## Installation
