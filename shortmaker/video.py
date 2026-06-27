@@ -11,6 +11,9 @@ import subprocess
 
 from .config import FONT_FILE, FPS, HEIGHT, WIDTH
 
+# Durée du fondu enchaîné entre deux scènes (0 = coupes franches).
+XFADE = float(os.getenv("XFADE_SECONDS", "0.4"))
+
 
 def _run(cmd: list[str]) -> None:
     proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -71,6 +74,33 @@ def _scene_clip_image(image: str, duration: float, dst: str, motion: bool) -> No
     ])
 
 
+def _xfade_chain(clips: list[str], durations: list[float], t: float, dst: str) -> None:
+    """Enchaîne les clips avec un fondu (xfade) de `t` secondes entre chaque scène.
+
+    Chaque clip a été rendu d'une durée `scène + t` : le décalage (offset) du fondu
+    est placé sur la frontière de narration (somme des durées précédentes), si bien
+    que chaque scène « arrive » à son instant exact -> audio et sous-titres synchro.
+    La vidéo finale dure `somme(durées) + t` ; le `-shortest` du muxage recoupe la
+    queue de `t` sur la longueur de l'audio.
+    """
+    cmd = ["ffmpeg", "-y"]
+    for c in clips:
+        cmd += ["-i", c]
+    steps, prev, off = [], "[0:v]", 0.0
+    for k in range(1, len(clips)):
+        off += durations[k - 1]
+        out = f"[v{k}]"
+        steps.append(
+            f"{prev}[{k}:v]xfade=transition=fade:duration={t:.3f}:offset={off:.3f}{out}"
+        )
+        prev = out
+    cmd += [
+        "-filter_complex", ";".join(steps), "-map", prev,
+        "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", dst,
+    ]
+    _run(cmd)
+
+
 def _concat_video(clips: list[str], dst: str, workdir: str) -> None:
     listfile = os.path.join(workdir, "clips.txt")
     with open(listfile, "w") as f:
@@ -112,17 +142,22 @@ def assemble(
     workdir = os.path.join(os.path.dirname(os.path.abspath(out_path)), "_work")
     os.makedirs(workdir, exist_ok=True)
 
-    # 1) un clip vidéo (muet) par scène
+    # 1) un clip (muet) par scène. Pour le fondu enchaîné, chaque clip est rendu
+    #    `dur + xfade` : la queue sert à la transition sans rogner la narration.
+    xfade = XFADE if len(scene_images) > 1 else 0.0
     clips = []
     for i, (img, dur) in enumerate(zip(scene_images, durations)):
         clip = os.path.join(workdir, f"scene_{i:02d}.mp4")
-        _scene_clip(img, dur, clip, motion)
+        _scene_clip(img, dur + xfade, clip, motion)
         clips.append(clip)
 
-    # 2) vidéo concaténée + 3) audio concaténé
+    # 2) vidéo (fondus enchaînés ou coupes franches) + 3) audio concaténé
     video_silent = os.path.join(workdir, "video_silent.mp4")
     audio = os.path.join(workdir, "audio.m4a")
-    _concat_video(clips, video_silent, workdir)
+    if xfade > 0:
+        _xfade_chain(clips, durations, xfade, video_silent)
+    else:
+        _concat_video(clips, video_silent, workdir)
     _concat_audio(mp3s, audio)
 
     # 4) incrustation sous-titres + bannière site sur la scène finale, puis muxage audio
