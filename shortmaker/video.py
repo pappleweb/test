@@ -20,7 +20,34 @@ def _run(cmd: list[str]) -> None:
         )
 
 
-def _scene_clip(image: str, duration: float, dst: str, motion: bool) -> None:
+_VIDEO_EXT = (".mp4", ".mov", ".webm", ".mkv", ".m4v")
+
+
+def _scene_clip(visual: str, duration: float, dst: str, motion: bool) -> None:
+    """Fabrique un clip de scène de durée `duration` à partir d'une image OU d'une vidéo
+    (détection par extension). Une vidéo trop courte est bouclée, trop longue rognée."""
+    if visual.lower().endswith(_VIDEO_EXT):
+        _scene_clip_video(visual, duration, dst)
+    else:
+        _scene_clip_image(visual, duration, dst, motion)
+
+
+def _scene_clip_video(src: str, duration: float, dst: str) -> None:
+    # -stream_loop -1 : boucle la source si elle est plus courte que la scène.
+    # -t : coupe à la durée exacte de la voix off. -an : on jette l'audio du stock.
+    vf = (
+        f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
+        f"crop={WIDTH}:{HEIGHT},setsar=1,fps={FPS},format=yuv420p"
+    )
+    _run([
+        "ffmpeg", "-y", "-stream_loop", "-1", "-i", src,
+        "-t", f"{duration:.3f}", "-an", "-vf", vf,
+        "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+        dst,
+    ])
+
+
+def _scene_clip_image(image: str, duration: float, dst: str, motion: bool) -> None:
     frames = max(2, round(duration * FPS))
     base = (
         f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"

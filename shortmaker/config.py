@@ -28,6 +28,9 @@ class Settings:
     anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
     pexels_api_key: str | None = os.getenv("PEXELS_API_KEY")
     pixabay_api_key: str | None = os.getenv("PIXABAY_API_KEY")
+    # Type de visuel : "image" (défaut, photos animées en Ken Burns) ou "video"
+    # (enchaînement de courts clips vidéo Pexels avec la voix off par-dessus).
+    visual_mode: str = os.getenv("VISUAL_MODE", "image")
     # Images : "stock" (banque gratuite Pexels/Pixabay, défaut) ou "flux" (IA générative).
     image_provider: str = os.getenv("IMAGE_PROVIDER", "stock")
     # FLUX via fal.ai. schnell = le moins cher (~0,003 $/image) ; dev/pro = endpoints à changer ici.

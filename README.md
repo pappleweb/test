@@ -45,6 +45,21 @@ Caractéristiques :
 Sans clé Anthropic, le scénario bascule sur un **résumé extractif 100 % gratuit**.
 Sans clé d'images, un **fond dégradé** est généré localement (les sous-titres restent lisibles).
 
+### Mode vidéo (clips au lieu d'images)
+
+Par défaut chaque scène est une photo animée (Ken Burns). Pour enchaîner de **courts
+clips vidéo** (gratuits, Pexels Videos) avec la voix off par-dessus :
+
+```bash
+export VISUAL_MODE=video      # nécessite PEXELS_API_KEY
+python make_short.py "https://mon-site.fr/article" --site https://mon-site.fr
+```
+
+- Un clip vertical par scène, **bouclé** s'il est trop court, **coupé** à la durée
+  exacte de la voix off de la scène, recadré en 1080×1920.
+- Repli automatique : si une scène n'a pas de clip, elle bascule en image fixe.
+- L'audio des clips est ignoré (on garde la voix off + sous-titres + CTA).
+
 ### Images IA (option qualité)
 
 Par défaut les images viennent des banques gratuites (`IMAGE_PROVIDER=stock`). Pour

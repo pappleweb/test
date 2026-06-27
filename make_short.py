@@ -76,14 +76,29 @@ def main() -> int:
         t_cursor += clip.duration
     print(f"  Durée totale ≈ {t_cursor:.1f}s.")
 
-    # 4) Une image par scène
-    print("• Images (banque gratuite)…")
+    # 4) Un visuel par scène : image fixe (défaut) ou court clip vidéo (VISUAL_MODE=video)
     scene_images = []
-    for i, scene in enumerate(sc.scenes):
-        img = os.path.join(assets, f"img_{i:02d}.jpg")
-        images.fetch_image(scene.image_query, img, seed=i)
-        scene_images.append(img)
-        print(f"  scène {i}: « {scene.image_query} »")
+    if SETTINGS.visual_mode == "video":
+        from shortmaker import videos
+        print("• Clips vidéo (Pexels, gratuit)…")
+        for i, scene in enumerate(sc.scenes):
+            clip = os.path.join(assets, f"clip_{i:02d}.mp4")
+            if videos.fetch_clip(scene.image_query, clip, seed=i):
+                scene_images.append(clip)
+                print(f"  scène {i}: clip « {scene.image_query} »")
+            else:
+                # Pas de clip trouvé -> repli image fixe pour cette scène.
+                img = os.path.join(assets, f"img_{i:02d}.jpg")
+                images.fetch_image(scene.image_query, img, seed=i)
+                scene_images.append(img)
+                print(f"  scène {i}: (pas de clip) image « {scene.image_query} »")
+    else:
+        print("• Images (banque gratuite)…")
+        for i, scene in enumerate(sc.scenes):
+            img = os.path.join(assets, f"img_{i:02d}.jpg")
+            images.fetch_image(scene.image_query, img, seed=i)
+            scene_images.append(img)
+            print(f"  scène {i}: « {scene.image_query} »")
 
     # 5) Sous-titres calés au mot
     ass_path = os.path.join(assets, "captions.ass")
