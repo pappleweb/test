@@ -35,6 +35,17 @@ def _trust_extra_ca() -> None:
         pass
 
 
+# Voix ElevenLabs prêtes à l'emploi (noms simples -> identifiants).
+# Voix féminines adaptées au français via le modèle eleven_multilingual_v2.
+ELEVEN_VOICES = {
+    "charlotte": "XB0fDUnXU5powFXDhCwa",
+    "alice": "Xb7hH8MSUJpSbSDYk0k2",
+    "matilda": "XrExE9yKIg1WjnnlVkGX",
+    "lily": "pFZP5JQG7iQjIQuC4Bku",
+    "sarah": "EXAVITQu4vr4xnSDxMaL",
+}
+
+
 @dataclass
 class WordTiming:
     text: str
@@ -120,9 +131,12 @@ def _synthesize_eleven(text: str, out_path: str) -> VoiceClip:
     if not key:
         raise RuntimeError("ELEVENLABS_API_KEY manquante")
 
+    # On accepte un nom de voix simple ("charlotte", "alice"…) ou un ID brut.
+    voice_id = ELEVEN_VOICES.get(SETTINGS.elevenlabs_voice_id.lower(),
+                                 SETTINGS.elevenlabs_voice_id)
     url = (
         f"https://api.elevenlabs.io/v1/text-to-speech/"
-        f"{SETTINGS.elevenlabs_voice_id}/with-timestamps"
+        f"{voice_id}/with-timestamps"
     )
     resp = requests.post(
         url,
