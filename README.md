@@ -134,6 +134,8 @@ Options utiles :
 | `--tts MOTEUR`| `auto` (défaut), `eleven` (ElevenLabs), `edge`, `espeak` (hors-ligne). |
 | `--no-llm`    | Force le scénario gratuit (sans Claude).                     |
 | `--no-motion` | Désactive le zoom des images.                                |
+| `--transition`| Active les fondus enchaînés entre scènes (coupes franches par défaut). |
+| `--xfade SEC` | Durée du fondu en secondes (implique `--transition`).        |
 | `--out DOSSIER`| Dossier de sortie.                                          |
 
 Lister les voix françaises disponibles :

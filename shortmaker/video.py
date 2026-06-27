@@ -7,12 +7,10 @@ les sous-titres calés au mot, et on ajoute la bannière du site sur la scène f
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 
 from .config import FONT_FILE, FPS, HEIGHT, WIDTH
-
-# Durée du fondu enchaîné entre deux scènes (0 = coupes franches).
-XFADE = float(os.getenv("XFADE_SECONDS", "0.4"))
 
 
 def _run(cmd: list[str]) -> None:
@@ -122,6 +120,14 @@ def _concat_audio(mp3s: list[str], dst: str) -> None:
     _run(cmd)
 
 
+def _display_url(url: str) -> str:
+    """URL d'affichage courte pour le CTA : on garde le domaine seul (sans
+    schéma, sans www, sans chemin) -> toujours lisible et contenu à l'écran."""
+    s = re.sub(r"^https?://", "", url.strip())
+    s = re.sub(r"^www\.", "", s)
+    return s.split("/")[0] or url.strip()
+
+
 def _drawtext_escape(text: str) -> str:
     for ch, esc in [("\\", r"\\"), (":", r"\:"), ("'", r"\'"), ("%", r"\%")]:
         text = text.replace(ch, esc)
@@ -138,13 +144,14 @@ def assemble(
     cta_end: float,
     out_path: str,
     motion: bool = True,
+    xfade: float = 0.0,
 ) -> str:
     workdir = os.path.join(os.path.dirname(os.path.abspath(out_path)), "_work")
     os.makedirs(workdir, exist_ok=True)
 
-    # 1) un clip (muet) par scène. Pour le fondu enchaîné, chaque clip est rendu
-    #    `dur + xfade` : la queue sert à la transition sans rogner la narration.
-    xfade = XFADE if len(scene_images) > 1 else 0.0
+    # 1) un clip (muet) par scène. Pour le fondu enchaîné (optionnel), chaque clip est
+    #    rendu `dur + xfade` : la queue sert à la transition sans rogner la narration.
+    xfade = xfade if (xfade > 0 and len(scene_images) > 1) else 0.0
     clips = []
     for i, (img, dur) in enumerate(zip(scene_images, durations)):
         clip = os.path.join(workdir, f"scene_{i:02d}.mp4")
@@ -160,12 +167,15 @@ def assemble(
         _concat_video(clips, video_silent, workdir)
     _concat_audio(mp3s, audio)
 
-    # 4) incrustation sous-titres + bannière site sur la scène finale, puis muxage audio
-    banner = _drawtext_escape(f"→ {site_url}")
+    # 4) incrustation sous-titres + bandeau site sur la scène finale, puis muxage audio.
+    #    On n'affiche que le DOMAINE (pas l'URL d'article complète) -> lisible, jamais
+    #    débordant. Texte blanc + contour, dans un bandeau sombre semi-opaque, centré.
+    banner = _drawtext_escape(f"→ {_display_url(site_url)}")
     drawtext = (
         f"drawtext=fontfile='{FONT_FILE}':text='{banner}':"
-        f"fontcolor=white:fontsize=52:box=1:boxcolor=black@0.6:boxborderw=24:"
-        f"x=(w-text_w)/2:y=h*0.16:enable='between(t,{cta_start:.2f},{cta_end:.2f})'"
+        f"fontcolor=white:fontsize=58:borderw=3:bordercolor=black:"
+        f"box=1:boxcolor=black@0.6:boxborderw=32:"
+        f"x=(w-text_w)/2:y=h*0.13:enable='between(t,{cta_start:.2f},{cta_end:.2f})'"
     )
     vf = f"subtitles='{ass_path}',{drawtext}"
 

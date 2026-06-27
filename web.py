@@ -34,7 +34,7 @@ def _looks_url(s: str) -> bool:
 
 
 def _run_job(job_id: str, source: str, site: str, voice: str,
-             tts: str, visual: str, images: str) -> None:
+             tts: str, visual: str, images: str, transition: bool) -> None:
     job = JOBS[job_id]
     out_dir = os.path.join(OUT_BASE, job_id)
     os.makedirs(out_dir, exist_ok=True)
@@ -52,6 +52,8 @@ def _run_job(job_id: str, source: str, site: str, voice: str,
            source_arg, "--out", out_dir, "--tts", tts]
     if site.strip():
         cmd += ["--site", site.strip()]
+    if transition:
+        cmd += ["--transition"]
 
     env = os.environ.copy()
     env["ELEVENLABS_VOICE_ID"] = voice
@@ -96,7 +98,8 @@ def api_generate():
     threading.Thread(
         target=_run_job,
         args=(job_id, source, data.get("site") or "", voice, tts,
-              data.get("visual") or "video", data.get("images") or "stock"),
+              data.get("visual") or "video", data.get("images") or "stock",
+              data.get("transition") == "on"),
         daemon=True,
     ).start()
     return jsonify(job_id=job_id)
@@ -200,6 +203,11 @@ PAGE = """<!doctype html>
     </div>
   </div>
 
+  <label style="display:flex;align-items:center;gap:8px;font-weight:500;margin-top:16px;">
+    <input type="checkbox" id="transition" style="width:auto;">
+    Transitions (fondus enchaînés entre scènes)
+  </label>
+
   <button id="go">Générer le Short</button>
 
   <div id="log"></div>
@@ -221,6 +229,7 @@ $('go').onclick = async () => {
   const log = $('log'); log.style.display='block'; log.textContent='• Lancement…';
   const fd = new FormData();
   for (const k of ['source','site','voice','visual','images']) fd.append(k, $(k).value);
+  fd.append('transition', $('transition').checked ? 'on' : 'off');
   let r = await fetch('/api/generate', {method:'POST', body:fd});
   if (!r.ok) { log.textContent = 'Erreur: ' + (await r.json()).error; $('go').disabled=false; return; }
   const { job_id } = await r.json();

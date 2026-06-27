@@ -38,7 +38,13 @@ def main() -> int:
                    help="Moteur voix : auto (eleven si clé, sinon edge), eleven, edge, espeak.")
     p.add_argument("--no-llm", action="store_true", help="Forcer le résumé gratuit (sans Claude).")
     p.add_argument("--no-motion", action="store_true", help="Désactiver le léger zoom des images.")
+    p.add_argument("--transition", action="store_true",
+                   help="Activer les fondus enchaînés entre scènes (coupes franches par défaut).")
+    p.add_argument("--xfade", type=float, default=None,
+                   help="Durée du fondu en secondes (implique --transition ; défaut 0.4).")
     args = p.parse_args()
+
+    xfade = args.xfade if args.xfade is not None else (0.4 if args.transition else 0.0)
 
     source = sys.stdin.read() if args.source == "-" else args.source
 
@@ -117,6 +123,7 @@ def main() -> int:
         cta_end=cta_end,
         out_path=out_mp4,
         motion=not args.no_motion,
+        xfade=xfade,
     )
 
     # 7) Métadonnées YouTube prêtes à coller
