@@ -37,11 +37,61 @@ Caractéristiques :
 | Voix off       | Edge-TTS (Microsoft)| 0 €  |
 | Voix off (option premium) | ElevenLabs | gratuit ~10k car./mois |
 | Images         | Pexels / Pixabay    | 0 €  |
+| Images (option qualité) | FLUX schnell (fal.ai) | ~0,02 € / short |
+| Images (option qualité) | Gemini image (OpenRouter) | ~0,5 € / short |
 | Montage        | ffmpeg              | 0 €  |
 | Scénario       | Claude Haiku (option)| ~0,01 € / short |
 
 Sans clé Anthropic, le scénario bascule sur un **résumé extractif 100 % gratuit**.
 Sans clé d'images, un **fond dégradé** est généré localement (les sous-titres restent lisibles).
+
+### Mode vidéo (clips au lieu d'images)
+
+Par défaut chaque scène est une photo animée (Ken Burns). Pour enchaîner de **courts
+clips vidéo** (gratuits, Pexels Videos) avec la voix off par-dessus :
+
+```bash
+export VISUAL_MODE=video      # nécessite PEXELS_API_KEY
+python make_short.py "https://mon-site.fr/article" --site https://mon-site.fr
+```
+
+- Un clip vertical par scène, **bouclé** s'il est trop court, **coupé** à la durée
+  exacte de la voix off de la scène, recadré en 1080×1920.
+- Repli automatique : si une scène n'a pas de clip, elle bascule en image fixe.
+- L'audio des clips est ignoré (on garde la voix off + sous-titres + CTA).
+
+### Images IA (option qualité)
+
+Par défaut les images viennent des banques gratuites (`IMAGE_PROVIDER=stock`). Pour
+des visuels générés sur mesure, deux providers IA sont dispos.
+
+**FLUX** (Black Forest Labs, via fal.ai) — le moins cher :
+
+```bash
+export IMAGE_PROVIDER=flux
+export FAL_KEY=...            # https://fal.ai/dashboard/keys
+python make_short.py "https://mon-site.fr/article" --site https://mon-site.fr
+```
+
+- **FLUX.1 schnell** (défaut) : ~0,003 $/image → **~2 cts/short**.
+- Modèle supérieur : `export FLUX_ENDPOINT=https://fal.run/fal-ai/flux/dev`.
+
+**Gemini** (via OpenRouter) — cadrage 9:16 natif :
+
+```bash
+export IMAGE_PROVIDER=openrouter
+export OPENROUTER_API_KEY=...   # https://openrouter.ai/keys
+python make_short.py "https://mon-site.fr/article" --site https://mon-site.fr
+```
+
+- **gemini-3.1-flash-image** (défaut) : 9:16 vertical natif, ~0,07 $/image (~0,5 $/short).
+- Moins cher mais carré : `export OPENROUTER_IMAGE_MODEL=google/gemini-2.5-flash-image`.
+
+Communs aux deux :
+
+- Style partagé entre les scènes (cohérence) réglable via `IMAGE_STYLE`.
+- Repli automatique : si l'IA échoue (quota, refus, réseau), on retombe sur
+  Pexels/Pixabay puis sur le dégradé local — un short sort toujours.
 
 ## Installation
 
@@ -84,6 +134,8 @@ Options utiles :
 | `--tts MOTEUR`| `auto` (défaut), `eleven` (ElevenLabs), `edge`, `espeak` (hors-ligne). |
 | `--no-llm`    | Force le scénario gratuit (sans Claude).                     |
 | `--no-motion` | Désactive le zoom des images.                                |
+| `--transition`| Active les fondus enchaînés entre scènes (coupes franches par défaut). |
+| `--xfade SEC` | Durée du fondu en secondes (implique `--transition`).        |
 | `--out DOSSIER`| Dossier de sortie.                                          |
 
 Lister les voix françaises disponibles :
@@ -92,10 +144,59 @@ Lister les voix françaises disponibles :
 edge-tts --list-voices | grep fr-
 ```
 
+## Interface web
+
+Pour générer un Short sans ligne de commande : colle une URL **ou le texte** de
+ton article, choisis la voix et le type de visuel, récupère la vidéo + le texte
+YouTube directement dans le navigateur.
+
+```bash
+python web.py            # puis ouvre http://localhost:5000
+```
+
+L'UI réutilise le moteur `make_short.py` (lancé en sous-processus) et affiche la
+progression en direct. Réglages exposés : voix, visuel (clips vidéo ou images
+animées), source des images (banque gratuite ou IA).
+
+- **Voix ElevenLabs** : le menu se remplit automatiquement avec les voix de ton
+  compte (via la clé active) ; tu peux aussi saisir un **ID de voix** précis.
+- **Clés API** (`/settings`) : enregistre **plusieurs clés par fournisseur** et
+  **active** celle à utiliser. Stockées en local dans `keys.json` (gitignoré),
+  prioritaires sur les variables d'environnement.
+
+### Déploiement (obtenir une URL en ligne)
+
+L'app est packagée dans un `Dockerfile` (Python + ffmpeg + espeak-ng + polices,
+servie par gunicorn). En local :
+
+```bash
+docker build -t shortmaker .
+docker run -p 8080:8080 \
+  -v shortmaker-data:/data \
+  -e ELEVENLABS_API_KEY=... -e PEXELS_API_KEY=... \
+  -e OPENROUTER_API_KEY=...                       \
+  shortmaker
+# -> http://localhost:8080
+```
+
+> Les clés `-e` sont optionnelles : tu peux aussi les saisir dans la page **/settings**
+> (elles ont la priorité). Le `-v shortmaker-data:/data` **persiste** ces clés d'un
+> redémarrage à l'autre ; sans ce volume, les clés saisies sont perdues à chaque
+> nouveau `docker run`.
+
+Pour une **URL publique permanente**, déploie cette image sur un hébergeur qui
+gère Docker (Render, Railway, Fly.io, Google Cloud Run…) : connecte le dépôt,
+renseigne les clés API en variables d'environnement, et l'hébergeur fournit
+l'URL. La génération étant lourde (ffmpeg), prévois une instance avec assez de
+CPU/RAM ; les jobs sont en mémoire (1 worker). Pour un usage multi-utilisateurs,
+remplace ce stockage en mémoire par une file de jobs persistante (Redis/Celery)
+et un stockage objet (S3) pour les vidéos produites.
+
 ## Comment c'est organisé
 
 ```
 make_short.py            # orchestrateur en ligne de commande
+web.py                   # interface web (Flask) : article -> vidéo dans le navigateur
 shortmaker/
   config.py              # réglages (format 1080x1920, voix, modèle…)
   extract.py             # URL/fichier/texte -> texte propre de l'article
@@ -103,7 +204,8 @@ shortmaker/
   tts.py                 # scénario -> voix off + timing mot-à-mot (Edge-TTS)
   images.py              # mots-clés -> image verticale (Pexels/Pixabay/dégradé)
   captions.py            # timings -> sous-titres ASS calés au mot
-  video.py               # assemblage final ffmpeg (clips, audio, sous-titres, CTA)
+  videos.py              # mots-clés -> court clip vidéo vertical (Pexels, mode video)
+  video.py               # assemblage final ffmpeg (clips, fondus, audio, sous-titres, CTA)
 ```
 
 ## Notes

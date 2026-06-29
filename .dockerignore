@@ -1,12 +1,11 @@
-.env
-__pycache__/
-*.pyc
 .venv/
 venv/
 out/
+__pycache__/
+*.pyc
+.git/
+.env
 *.mp3
 *.m4a
 *.mp4
 *.wav
-.cache/
-keys.json

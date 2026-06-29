@@ -38,7 +38,13 @@ def main() -> int:
                    help="Moteur voix : auto (eleven si clé, sinon edge), eleven, edge, espeak.")
     p.add_argument("--no-llm", action="store_true", help="Forcer le résumé gratuit (sans Claude).")
     p.add_argument("--no-motion", action="store_true", help="Désactiver le léger zoom des images.")
+    p.add_argument("--transition", action="store_true",
+                   help="Activer les fondus enchaînés entre scènes (coupes franches par défaut).")
+    p.add_argument("--xfade", type=float, default=None,
+                   help="Durée du fondu en secondes (implique --transition ; défaut 0.4).")
     args = p.parse_args()
+
+    xfade = args.xfade if args.xfade is not None else (0.4 if args.transition else 0.0)
 
     source = sys.stdin.read() if args.source == "-" else args.source
 
@@ -76,14 +82,46 @@ def main() -> int:
         t_cursor += clip.duration
     print(f"  Durée totale ≈ {t_cursor:.1f}s.")
 
-    # 4) Une image par scène
-    print("• Images (banque gratuite)…")
+    # 4) Un visuel par scène : image fixe (défaut) ou court clip vidéo (VISUAL_MODE=video)
     scene_images = []
-    for i, scene in enumerate(sc.scenes):
-        img = os.path.join(assets, f"img_{i:02d}.jpg")
-        images.fetch_image(scene.image_query, img, seed=i)
-        scene_images.append(img)
-        print(f"  scène {i}: « {scene.image_query} »")
+    if SETTINGS.visual_mode == "video":
+        from shortmaker import videos
+        print("• Clips vidéo (Pexels, gratuit)…")
+        for i, scene in enumerate(sc.scenes):
+            clip = os.path.join(assets, f"clip_{i:02d}.mp4")
+            if videos.fetch_clip(scene.image_query, clip, seed=i):
+                scene_images.append(clip)
+                print(f"  scène {i}: clip « {scene.image_query} »")
+            else:
+                # Pas de clip trouvé -> repli image fixe pour cette scène.
+                img = os.path.join(assets, f"img_{i:02d}.jpg")
+                images.fetch_image(scene.image_query, img, seed=i)
+                scene_images.append(img)
+                print(f"  scène {i}: (pas de clip) image « {scene.image_query} »")
+    else:
+        # En mode image + banque gratuite, on privilégie les images du CORPS de
+        # l'article (si présentes et assez grandes), puis on complète avec Pexels.
+        article_imgs: list[str] = []
+        if SETTINGS.image_provider == "stock" and article.images:
+            print("• Images de l'article…")
+            for j, src in enumerate(article.images):
+                cand = os.path.join(assets, f"art_{j:02d}.jpg")
+                if images.download_validated(src, cand):
+                    article_imgs.append(cand)
+                if len(article_imgs) >= len(sc.scenes):
+                    break
+            print(f"  {len(article_imgs)} image(s) récupérée(s) dans l'article.")
+
+        print("• Images (banque gratuite)…")
+        for i, scene in enumerate(sc.scenes):
+            if i < len(article_imgs):
+                scene_images.append(article_imgs[i])
+                print(f"  scène {i}: image de l'article")
+            else:
+                img = os.path.join(assets, f"img_{i:02d}.jpg")
+                images.fetch_image(scene.image_query, img, seed=i)
+                scene_images.append(img)
+                print(f"  scène {i}: « {scene.image_query} » (Pexels)")
 
     # 5) Sous-titres calés au mot
     ass_path = os.path.join(assets, "captions.ass")
@@ -102,6 +140,7 @@ def main() -> int:
         cta_end=cta_end,
         out_path=out_mp4,
         motion=not args.no_motion,
+        xfade=xfade,
     )
 
     # 7) Métadonnées YouTube prêtes à coller
