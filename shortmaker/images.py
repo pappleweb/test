@@ -168,6 +168,26 @@ def _pixabay(query: str, seed: int) -> str | None:
 
 # ---------------------------------------------------------------- Helpers
 
+def download_validated(url: str, dst_path: str, min_side: int = 500) -> bool:
+    """Télécharge une image (ex. tirée du corps d'un article) et ne la garde que si
+    elle est assez grande pour un fond vertical (évite vignettes, icônes, pubs)."""
+    if not _download(url, dst_path):
+        return False
+    try:
+        from PIL import Image
+
+        with Image.open(dst_path) as im:
+            w, h = im.size
+        if min(w, h) < min_side:
+            os.remove(dst_path)
+            return False
+        return True
+    except Exception:
+        if os.path.exists(dst_path):
+            os.remove(dst_path)
+        return False
+
+
 def _download(url: str, dst_path: str) -> bool:
     try:
         r = requests.get(url, timeout=_TIMEOUT, stream=True)

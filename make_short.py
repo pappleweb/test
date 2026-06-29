@@ -99,12 +99,29 @@ def main() -> int:
                 scene_images.append(img)
                 print(f"  scène {i}: (pas de clip) image « {scene.image_query} »")
     else:
+        # En mode image + banque gratuite, on privilégie les images du CORPS de
+        # l'article (si présentes et assez grandes), puis on complète avec Pexels.
+        article_imgs: list[str] = []
+        if SETTINGS.image_provider == "stock" and article.images:
+            print("• Images de l'article…")
+            for j, src in enumerate(article.images):
+                cand = os.path.join(assets, f"art_{j:02d}.jpg")
+                if images.download_validated(src, cand):
+                    article_imgs.append(cand)
+                if len(article_imgs) >= len(sc.scenes):
+                    break
+            print(f"  {len(article_imgs)} image(s) récupérée(s) dans l'article.")
+
         print("• Images (banque gratuite)…")
         for i, scene in enumerate(sc.scenes):
-            img = os.path.join(assets, f"img_{i:02d}.jpg")
-            images.fetch_image(scene.image_query, img, seed=i)
-            scene_images.append(img)
-            print(f"  scène {i}: « {scene.image_query} »")
+            if i < len(article_imgs):
+                scene_images.append(article_imgs[i])
+                print(f"  scène {i}: image de l'article")
+            else:
+                img = os.path.join(assets, f"img_{i:02d}.jpg")
+                images.fetch_image(scene.image_query, img, seed=i)
+                scene_images.append(img)
+                print(f"  scène {i}: « {scene.image_query} » (Pexels)")
 
     # 5) Sous-titres calés au mot
     ass_path = os.path.join(assets, "captions.ass")
