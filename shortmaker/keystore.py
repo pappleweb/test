@@ -14,7 +14,9 @@ import os
 import threading
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-KEYS_FILE = os.path.join(_ROOT, "keys.json")
+# Emplacement du fichier de clés. Surchargable par KEYS_FILE pour le persister
+# hors du conteneur (ex. monté sur un volume Docker) -> survit aux redémarrages.
+KEYS_FILE = os.getenv("KEYS_FILE") or os.path.join(_ROOT, "keys.json")
 
 # Fournisseur -> variable d'environnement consommée par le pipeline.
 ENV_VAR = {
@@ -39,6 +41,7 @@ def _read() -> dict:
 
 
 def _write(data: dict) -> None:
+    os.makedirs(os.path.dirname(KEYS_FILE) or ".", exist_ok=True)
     with open(KEYS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 

@@ -172,11 +172,17 @@ servie par gunicorn). En local :
 ```bash
 docker build -t shortmaker .
 docker run -p 8080:8080 \
+  -v shortmaker-data:/data \
   -e ELEVENLABS_API_KEY=... -e PEXELS_API_KEY=... \
   -e OPENROUTER_API_KEY=...                       \
   shortmaker
 # -> http://localhost:8080
 ```
+
+> Les clés `-e` sont optionnelles : tu peux aussi les saisir dans la page **/settings**
+> (elles ont la priorité). Le `-v shortmaker-data:/data` **persiste** ces clés d'un
+> redémarrage à l'autre ; sans ce volume, les clés saisies sont perdues à chaque
+> nouveau `docker run`.
 
 Pour une **URL publique permanente**, déploie cette image sur un hébergeur qui
 gère Docker (Render, Railway, Fly.io, Google Cloud Run…) : connecte le dépôt,

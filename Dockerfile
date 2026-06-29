@@ -18,5 +18,10 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
+# Clés enregistrées via /settings -> dans /data (monter un volume pour les garder
+# d'un redémarrage à l'autre :  -v shortmaker-data:/data ).
+ENV KEYS_FILE=/data/keys.json
+VOLUME /data
+
 # 1 worker (les jobs sont stockés en mémoire), plusieurs threads pour le suivi de statut.
 CMD ["sh", "-c", "gunicorn -w 1 --threads 8 -b 0.0.0.0:${PORT} --timeout 120 web:app"]
