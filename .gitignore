@@ -9,3 +9,4 @@ out/
 *.mp4
 *.wav
 .cache/
+keys.json

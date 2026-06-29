@@ -155,8 +155,14 @@ python web.py            # puis ouvre http://localhost:5000
 ```
 
 L'UI réutilise le moteur `make_short.py` (lancé en sous-processus) et affiche la
-progression en direct. Réglages exposés : voix (ElevenLabs ou Edge gratuit),
-visuel (clips vidéo ou images animées), source des images (banque gratuite ou IA).
+progression en direct. Réglages exposés : voix, visuel (clips vidéo ou images
+animées), source des images (banque gratuite ou IA).
+
+- **Voix ElevenLabs** : le menu se remplit automatiquement avec les voix de ton
+  compte (via la clé active) ; tu peux aussi saisir un **ID de voix** précis.
+- **Clés API** (`/settings`) : enregistre **plusieurs clés par fournisseur** et
+  **active** celle à utiliser. Stockées en local dans `keys.json` (gitignoré),
+  prioritaires sur les variables d'environnement.
 
 ### Déploiement (obtenir une URL en ligne)
 
